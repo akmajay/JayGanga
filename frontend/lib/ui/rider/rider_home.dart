@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/location_service.dart';
 import '../../services/tracking_service.dart';
+import '../../services/ride_service.dart';
 
 class RiderHome extends StatefulWidget {
   const RiderHome({super.key});
@@ -127,9 +128,10 @@ class _RiderHomeState extends State<RiderHome> {
                 distance: 5.0,
                 initialFare: 100,
               );
+              final otp = ride.data['start_otp'];
               setState(() {
                 _activeRideId = ride.id;
-                _otp = ride.getString('start_otp');
+                _otp = otp?.toString();
               });
             },
             child: const Text('SEARCH RIDES', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -202,7 +204,7 @@ class _RiderHomeState extends State<RiderHome> {
           decoration: BoxDecoration(color: Colors.orangeAccent, borderRadius: BorderRadius.circular(16)),
           child: Text(
             _otp ?? '----',
-            style: const TextStyle(color: Colors.black, fontSize: 32, fontWeight: FontWeight.black, letterSpacing: 8),
+            style: const TextStyle(color: Colors.black, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 8),
           ),
         ),
       ],
