@@ -1,7 +1,7 @@
 PROJECT REPORT: Zero-Commission Ride-Hailing Platform
 1. Core Philosophy
 package : com.ride.jayganga
-android app for rider and captain and web app for admin (last)
+android app for rider (1) and captain (2) and web app for admin (3)
 Google Sign in for rider and captain and admin
 Proper RLS
 Use PocketBase (latest 0.36.8) with custom  go backend not goja.

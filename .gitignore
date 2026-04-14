@@ -11,6 +11,10 @@ frontend/.pub/
 frontend/build/
 frontend/android/app/google-services.json
 
+# Keystores
+*.jks
+*.keystore
+
 # IDEs
 .idea/
 .vscode/
