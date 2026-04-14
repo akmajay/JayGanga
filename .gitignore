@@ -1,0 +1,18 @@
+# Go
+backend/pb_data/
+backend/backend.exe
+backend/backend
+
+# Flutter
+frontend/.dart_tool/
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+frontend/build/
+frontend/android/app/google-services.json
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.log
