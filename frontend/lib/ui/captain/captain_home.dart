@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../services/location_service.dart';
 import '../../services/tracking_service.dart';
 import '../../services/ride_service.dart';
+import '../../services/auth_service.dart';
 
 class CaptainHome extends StatefulWidget {
   const CaptainHome({super.key});
@@ -16,8 +17,9 @@ class CaptainHome extends StatefulWidget {
 
 class _CaptainHomeState extends State<CaptainHome> {
   final LocationService _location = LocationService();
-  final TrackingService _tracking = TrackingService();
   final RideService _rideService = RideService();
+  final AuthService _auth = AuthService();
+  final TrackingService _tracking = TrackingService();
   GoogleMapController? _mapController;
   LatLng? _currentPos;
   bool _isOnline = false;
@@ -126,6 +128,9 @@ class _CaptainHomeState extends State<CaptainHome> {
   }
 
   void _toggleOnline() {
+    final userId = _auth.currentUser?.id;
+    if (userId == null) return;
+
     setState(() {
       _isOnline = !_isOnline;
     });
@@ -134,7 +139,7 @@ class _CaptainHomeState extends State<CaptainHome> {
       // Start broadcasting location via WebSocket
       _location.getPositionStream().listen((pos) {
         if (_isOnline) {
-          _tracking.updateLocation("temp_id", pos.latitude, pos.longitude, "available");
+          _tracking.updateLocation(userId, pos.latitude, pos.longitude, "available");
         }
       });
     }

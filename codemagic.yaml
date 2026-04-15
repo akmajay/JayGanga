@@ -1,0 +1,24 @@
+workflows:
+  android-workflow:
+    name: JayGanga Android Build
+    working_directory: frontend
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      java: 17
+      groups:
+        - google_play # Optional: for future publishing
+    scripts:
+      - name: Install dependencies
+        script: |
+          flutter pub get
+      - name: Build Android APK
+        script: |
+          flutter build apk --release --no-pub
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+    publishing:
+      email:
+        recipients:
+          - akmajay@gmail.com # Replace with your email

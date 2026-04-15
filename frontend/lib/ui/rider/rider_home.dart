@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import '../../services/location_service.dart';
 import '../../services/tracking_service.dart';
 import '../../services/ride_service.dart';
@@ -27,23 +29,52 @@ class _RiderHomeState extends State<RiderHome> {
     _listenForCaptains();
   }
 
+  bool _isSelectingPickup = true;
+  bool _isSelectingDropoff = false;
+  LatLng? _tempCenter;
+  String _pickupAddress = "Locating...";
+  String _dropAddress = "Selecting...";
+  LatLng? _pickupLatLng;
+  LatLng? _dropLatLng;
+
   void _initLocation() async {
     final hasPermission = await _location.handleLocationPermission();
     if (hasPermission) {
       final pos = await _location.getCurrentPosition();
+      final latLng = LatLng(pos.latitude, pos.longitude);
       setState(() {
-        _currentPos = LatLng(pos.latitude, pos.longitude);
+        _currentPos = latLng;
+        _tempCenter = latLng;
+        _pickupLatLng = latLng;
       });
-      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_currentPos!, 15));
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
       _tracking.queryNearby(pos.latitude, pos.longitude);
+      _getAddressFromLatLng(latLng, true);
     }
   }
 
   void _listenForCaptains() {
     _tracking.stream.listen((data) {
-      // Logic to parse nearby_captains and update markers
-      // This is the real-time core
+      // Logic to parse nearby_captains and update markers in real-time
     });
+  }
+
+  Future<void> _getAddressFromLatLng(LatLng pos, bool isPickup) async {
+    // Note: This requires Geocoding API enabled on the key
+    final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.latitude},${pos.longitude}&key=AIzaSyCSTul_3IBZuhT9MOuMdH5-A3zrxCOyucM';
+    try {
+      final resp = await http.get(Uri.parse(url));
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data['status'] == 'OK') {
+          final addr = data['results'][0]['formatted_address'];
+          setState(() {
+            if (isPickup) _pickupAddress = addr;
+            else _dropAddress = addr;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -59,8 +90,46 @@ class _RiderHomeState extends State<RiderHome> {
                 onMapCreated: (ctrl) => _mapController = ctrl,
                 markers: _markers,
                 myLocationEnabled: true,
-                style: _mapStyle, // Custom Dark Map Style
+                onCameraMove: (pos) => _tempCenter = pos.target,
+                onCameraIdle: () {
+                  if (_tempCenter != null && (_isSelectingPickup || _isSelectingDropoff)) {
+                    _getAddressFromLatLng(_tempCenter!, _isSelectingPickup);
+                  }
+                },
+                style: _mapStyle,
               ),
+
+          // center pin pointer
+          if (_isSelectingPickup || _isSelectingDropoff)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 35),
+                child: Icon(
+                  Icons.location_on, 
+                  size: 50, 
+                  color: _isSelectingPickup ? Colors.greenAccent : Colors.orangeAccent
+                ),
+              ),
+            ),
+
+          // Top Selection Banner
+          if (_isSelectingPickup || _isSelectingDropoff)
+            Positioned(
+              top: 60, left: 20, right: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Text(
+                  _isSelectingPickup ? '📍 MOVE MAP TO PICKUP' : '🏁 DRAG TO DESTINATION',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
 
           // Bottom Search Bar (Glassmorphic)
           Positioned(
@@ -81,7 +150,7 @@ class _RiderHomeState extends State<RiderHome> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.85),
+        color: Colors.black.withOpacity(0.9),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white10),
       ),
@@ -90,25 +159,32 @@ class _RiderHomeState extends State<RiderHome> {
         children: [
           Row(
             children: [
-              const Icon(Icons.circle, color: Colors.greenAccent, size: 12),
+              Icon(Icons.circle, color: _isSelectingPickup ? Colors.greenAccent : Colors.white24, size: 10),
               const SizedBox(width: 10),
-              const Expanded(child: Text('Current Location', style: TextStyle(color: Colors.white70))),
+              Expanded(
+                child: Text(
+                  _isSelectingPickup ? "Set Pickup: $_pickupAddress" : "Pickup: $_pickupAddress",
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: _isSelectingPickup ? Colors.white : Colors.white38),
+                )
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Row(
+            children: [
+              Icon(Icons.location_on, color: _isSelectingDropoff ? Colors.orangeAccent : Colors.white24, size: 14),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _isSelectingDropoff ? "Set Dropoff: $_dropAddress" : "Dropoff: $_dropAddress",
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: _isSelectingDropoff ? Colors.white : Colors.white38),
+                )
+              ),
             ],
           ),
           const Divider(color: Colors.white10, height: 30),
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Where to?',
-              prefixIcon: const Icon(Icons.location_on, color: Colors.orangeAccent),
-              filled: true,
-              fillColor: Colors.white12,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orangeAccent,
@@ -117,24 +193,49 @@ class _RiderHomeState extends State<RiderHome> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () async {
-              setState(() => _requesting = true);
-              final ride = await RideService().createRide(
-                pickupAddress: 'Current Location',
-                dropAddress: 'Destination',
-                pickupLat: _currentPos!.latitude,
-                pickupLng: _currentPos!.longitude,
-                dropLat: 0,
-                dropLng: 0,
-                distance: 5.0,
-                initialFare: 100,
-              );
-              final otp = ride.data['start_otp'];
-              setState(() {
-                _activeRideId = ride.id;
-                _otp = otp?.toString();
-              });
+              try {
+                if (_isSelectingPickup) {
+                  setState(() {
+                    _pickupLatLng = _tempCenter;
+                    _isSelectingPickup = false;
+                    _isSelectingDropoff = true;
+                  });
+                  // Move map slightly to prompt user to drag for destination
+                } else if (_isSelectingDropoff) {
+                  setState(() {
+                    _dropLatLng = _tempCenter;
+                    _isSelectingDropoff = false;
+                    _requesting = true;
+                  });
+                  
+                  final ride = await RideService().createRide(
+                    pickupAddress: _pickupAddress,
+                    dropAddress: _dropAddress,
+                    pickupLat: _pickupLatLng!.latitude,
+                    pickupLng: _pickupLatLng!.longitude,
+                    dropLat: _dropLatLng!.latitude,
+                    dropLng: _dropLatLng!.longitude,
+                    distance: 5.0,
+                    initialFare: 100,
+                  );
+                  
+                  setState(() {
+                    _activeRideId = ride.id;
+                    _otp = ride.data['start_otp']?.toString();
+                  });
+                }
+              } catch (e) {
+                print("Ride Request Error: $e");
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to request ride: $e'), backgroundColor: Colors.redAccent)
+                );
+                setState(() => _requesting = false);
+              }
             },
-            child: const Text('SEARCH RIDES', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(
+              _isSelectingPickup ? 'CONFIRM PICKUP' : 'CONFIRM DESTINATION',
+              style: const TextStyle(fontWeight: FontWeight.bold)
+            ),
           ),
         ],
       ),

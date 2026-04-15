@@ -128,6 +128,12 @@ func main() {
 
 	// 3. Matchmaking Hooks
 	app.OnRecordCreate("rides").BindFunc(func(e *core.RecordEvent) error {
+		// Generate random 4-digit OTP if not provided
+		if e.Record.GetInt("start_otp") == 0 {
+			otpStr := security.RandomStringWithAlphabet(4, "123456789")
+			e.Record.Set("start_otp", otpStr)
+		}
+
 		err := e.Next() 
 		if err != nil {
 			return err

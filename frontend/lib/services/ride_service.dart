@@ -61,7 +61,7 @@ class RideService {
   Stream<RecordModel?> streamBids(String rideId) {
     // PocketBase real-time subscription
     return pb.collection('bids').subscribe("*", (e) {
-      if (e.action == "create" && e.record?.getString("ride_id") == rideId) {
+      if (e.action == "create" && e.record?.data["ride_id"] == rideId) {
         // New bid found
       }
     }).then((_) => null).asStream().map((event) => null);

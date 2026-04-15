@@ -1,58 +1,49 @@
-import 'dart:convert';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:fetch_client/fetch_client.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:pocketbase/pocketbase.dart';
-import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 class AuthService {
   // Config
-  static const String baseUrl = 'http://localhost:8090'; // Change to your VPS IP in production
+  static const String baseUrl = 'http://localhost:8090'; 
   
-  final PocketBase pb = PocketBase(baseUrl);
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'],
-  );
+  static final AuthService _instance = AuthService._internal();
+  late final PocketBase pb;
 
-  /// Authenticate with Google and then with our custom PocketBase endpoint
+  // Singleton accessor
+  factory AuthService() => _instance;
+
+  AuthService._internal() {
+    // On Web, we MUST use FetchClient to support OAuth2 streaming responses
+    pb = PocketBase(
+      baseUrl,
+      httpClientFactory: kIsWeb 
+          ? () => FetchClient(mode: RequestMode.cors) 
+          : null,
+    );
+  }
+
+  /// Real Native OAuth2 Google Sign-In for Web
   Future<RecordAuth?> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null;
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
-
-      if (idToken == null) {
-        throw Exception("Failed to get Google ID Token");
-      }
-
-      // Call our custom Go endpoint to verify token and get PocketBase JWT
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/ride/auth-google'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'idToken': idToken}),
+      final authData = await pb.collection('users').authWithOAuth2(
+        'google',
+        (url) async {
+          // Opens Google Login in the same tab (standard for single-page apps)
+          // or use webOnlyWindowName: '_blank' for a popup
+          await launchUrl(url);
+        },
       );
-
-      if (response.statusCode != 200) {
-        throw Exception("Backend auth failed: ${response.body}");
-      }
-
-      final data = jsonDecode(response.body);
       
-      // Manually update the PocketBase AuthStore with the received token and model
-      final token = data['token'];
-      final model = RecordModel.fromJson(data['record']);
-      
-      pb.authStore.save(token, model);
-      
-      return RecordAuth(token: token, record: model);
+      print("Successfully authenticated User: ${authData.record.id}");
+      return authData;
     } catch (e) {
-      print("Google Sign-In Error: $e");
-      rethrow;
+      print("Native OAuth2 Error: $e");
+      return null;
     }
   }
 
   void signOut() {
-    _googleSignIn.signOut();
     pb.authStore.clear();
   }
 
